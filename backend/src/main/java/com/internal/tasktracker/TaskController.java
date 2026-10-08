@@ -40,6 +40,22 @@ public class TaskController {
         System.out.println("[TaskController] q=\"" + query + "\" status=" + normalizedStatus
                 + " page=" + page + " pageSize=" + pageSize);
 
+
+        // Validate pagination inputs
+        if (page < 1) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", "page must be greater than 0"));
+        }
+
+        if (pageSize < 1 || pageSize > 100) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("error",
+                    "pageSize must be between 1 and 100"));
+        }
+
+
+
+
         List<Task> allResults = taskRepository.searchTasks(searchTerm, normalizedStatus);
 
         int start = (page - 1) * pageSize;
