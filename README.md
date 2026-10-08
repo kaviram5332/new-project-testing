@@ -224,5 +224,347 @@ After we review your submission, we will schedule a short call. Be ready to disc
 This codebase has issues at multiple levels — some obvious, some subtle, some that are really future risks rather than current bugs. **You are not expected to find or fix everything.** Focus on what you believe is highest value, explain your reasoning, and stop when the timebox is up.
 
 Good luck.
-#   n e w - p r o j e c t - t e s t i n g  
+#   n e w - p r o j e c t - t e s t i n g 
+
+
+
+# Task Tracker Application
+
+A small full-stack Task Tracker application built with **React, Spring Boot, and H2**.
+
+This repository is a focused patch submission for a full-stack debugging exercise. The goal was to identify high-value issues across the SQL, backend, and API layers and make small, safe fixes without rewriting the application.
+
+---
+
+## Overview
+
+The application allows users to:
+
+- Search tasks by title or description
+- Filter tasks by status
+- View paginated task results
+- Access task data through a REST API
+- Store task data using an H2 database
+
+### Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite 5, JavaScript |
+| Backend | Spring Boot 3.2, Java 17+ |
+| Database | H2 |
+| Persistence | Spring Data JPA |
+| SQL Reference | H2 / Oracle SQL |
+
+---
+
+## Project Structure
+
+```text
+task-tracker/
+│
+├── backend/
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/
+│   │   │   └── resources/
+│   │   ├── pom.xml
+│   │   ├── mvnw
+│   │   └── mvnw.cmd
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── App.jsx
+│   │   └── api.js
+│   ├── package.json
+│   └── vite.config.js
+│
+├── db/
+│   ├── queries/
+│   └── oracle/
+│
+├── handwritten/
+│   └── handwritten bug explanations
+│
+├── NOTES.md
+└── README.md
+```
+
+---
+
+# Bugs Identified and Fixed
+
+## 1. SQL Search Precedence Bug
+
+### Problem
+
+The search query used `AND` and `OR` without grouping the title and description conditions.
+
+Because SQL evaluates `AND` before `OR`, the original query could apply the `archived` and `status` conditions incorrectly.
+
+### Fix
+
+Grouped the search conditions using parentheses:
+
+```sql
+WHERE archived = FALSE
+AND (
+    LOWER(title) LIKE :term
+    OR LOWER(description) LIKE :term
+)
+AND (:status IS NULL OR status = :status)
+```
+
+The same logical correction was applied to the SQL reference artifacts.
+
+### Result
+
+- Search results are more accurate.
+- Archived tasks are correctly excluded.
+- Status filtering is applied consistently.
+
+---
+
+## 2. API Input Validation
+
+### Problem
+
+Invalid pagination values such as:
+
+```text
+page=0
+page=-1
+pageSize=0
+```
+
+were not rejected properly.
+
+Invalid status values could also cause an API error.
+
+### Fix
+
+Added validation for:
+
+```text
+page >= 1
+1 <= pageSize <= 100
+valid task status
+```
+
+Invalid requests now return:
+
+```text
+HTTP 400 Bad Request
+```
+
+### Result
+
+The API handles invalid client input more safely and predictably.
+
+---
+
+## 3. Artificial API Delay
+
+### Problem
+
+The request path contained an artificial delay using `Thread.sleep()`.
+
+This caused every API request to wait unnecessarily.
+
+### Fix
+
+Removed the artificial delay.
+
+### Result
+
+API requests can now complete without the unnecessary wait.
+
+---
+
+# Existing Frontend Protections Verified
+
+During the review, I also checked the frontend for two potential issues.
+
+### Pagination Reset
+
+The application already resets pagination when search or status filters change:
+
+```javascript
+setPage(1);
+```
+
+Therefore, no additional change was required.
+
+### Stale Search Requests
+
+The application already uses `AbortController` to cancel previous requests.
+
+This prevents an older search response from incorrectly replacing a newer result.
+
+Therefore, no additional change was required.
+
+---
+
+# Testing
+
+The application was checked using the existing startup process and the main task-search flows.
+
+### Manual checks
+
+- Task list loads successfully
+- Search by title/description
+- Status filtering
+- Search + status filtering
+- Pagination
+- Invalid pagination parameters
+- Invalid status input
+- API response behavior
+
+Example API request:
+
+```text
+http://localhost:8080/api/tasks?q=api&page=1&pageSize=5
+```
+
+---
+
+# Running the Application
+
+## Prerequisites
+
+- Java 17 or higher
+- Node.js 18 or higher
+- npm
+
+No Docker or external database is required.
+
+---
+
+## Start the Backend
+
+### Windows
+
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+
+### macOS / Linux
+
+```bash
+cd backend
+./mvnw spring-boot:run
+```
+
+Backend:
+
+```text
+http://localhost:8080
+```
+
+---
+
+## Start the Frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
+
+Open the frontend URL in your browser.
+
+---
+
+# API
+
+### Get tasks
+
+```text
+GET /api/tasks
+```
+
+### Search tasks
+
+```text
+GET /api/tasks?q=api
+```
+
+### Filter by status
+
+```text
+GET /api/tasks?status=OPEN
+```
+
+### Search + pagination
+
+```text
+GET /api/tasks?q=api&page=1&pageSize=5
+```
+
+---
+
+# H2 Database
+
+The application uses an in-memory H2 database.
+
+H2 Console:
+
+```text
+http://localhost:8080/h2-console
+```
+
+Connection details:
+
+```text
+JDBC URL: jdbc:h2:mem:taskdb
+Username: sa
+Password: leave blank
+```
+
+---
+
+# Scope and Trade-offs
+
+This submission intentionally focuses on high-value correctness and API issues rather than rewriting the application.
+
+I did not make broad architectural changes or redesign the UI because the exercise is time-boxed and the existing structure was sufficient for the required functionality.
+
+One remaining risk is the lack of comprehensive automated tests around search, filtering, pagination, and invalid API input. With more time, I would add unit and integration tests for these cases.
+
+---
+
+# AI Usage
+
+AI tools were used during the code review and debugging process to help identify potential issues, reason about SQL behavior, and review possible fixes.
+
+All implemented changes were reviewed and understood before being applied.
+
+The final changes were kept intentionally small and focused on the highest-value issues.
+
+---
+
+# Author
+
+**Kavi**
+
+Full-Stack Software Engineer Candidate
+
+
+
+
+
+
+
+ 
  
